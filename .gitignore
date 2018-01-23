@@ -2,3 +2,4 @@
 xdfimport*.zip
 xdf.zip
 *.pyc
+*.egg-info/

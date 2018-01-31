@@ -31,10 +31,10 @@ def load_xdf(filename,
              winsor_threshold=0.0001):
     """Import an XDF file.
 
-    This is an importer for multi-stream XDF (Extensible Data Format) 
-    recordings. All information covered by the XDF 1.0 specification is 
-    imported, plus any additional meta-data associated with streams or with 
-    the container file itself. 
+    This is an importer for multi-stream XDF (Extensible Data Format)
+    recordings. All information covered by the XDF 1.0 specification is
+    imported, plus any additional meta-data associated with streams or with
+    the container file itself.
 
     See http://code.google.com/p/xdf/ for more information on XDF.
 
@@ -42,9 +42,9 @@ def load_xdf(filename,
     synchronization, support for breaks in the data, as well as some other
     defects.
 
-    Args: 
+    Args:
         filename : name of the file to import (*.xdf or *.xdfz)
-        
+
         verbose : Whether to print verbose diagnostics. (default: false)
 
         synchronize_clocks : Whether to enable clock synchronization based on
@@ -107,10 +107,10 @@ def load_xdf(filename,
         streams : list of dicts, one for each stream; the dicts
                   have the following content:
                  ['time_series'] entry: contains the stream's time series
-                   [#Channels x #Samples] this matrix is of the type declared in
-                   ['info']['channel_format']
-                 ['time_stamps'] entry: contains the time stamps for each sample
-                   (synced across streams)
+                   [#Channels x #Samples] this matrix is of the type declared
+                   in ['info']['channel_format']
+                 ['time_stamps'] entry: contains the time stamps for each
+                   sample (synced across streams)
 
                  ['info'] field: contains the meta-data of the stream
                    (all values are strings)
@@ -217,7 +217,7 @@ def load_xdf(filename,
         # read [MagicCode]
         if f.read(4) != b'XDF:':
             raise Exception('not a valid XDF file: %s' % filename)
-        
+
         # for each chunk...
         while True:
 
@@ -225,7 +225,7 @@ def load_xdf(filename,
             try:
                 # read [NumLengthBytes], [Length]
                 chunklen = _read_varlen_int(f)
-            except:
+            except Exception:
                 if f.tell() < filesize-1024:
                     print('  got zero-length chunk, scanning forward to next '
                           'boundary chunk.')
@@ -265,14 +265,14 @@ def load_xdf(filename,
                     # read [StreamId]
                     s = struct.unpack('<I', f.read(4))[0]
                     # read [NumSampleBytes], [NumSamples]
-                    nsamples = _read_varlen_int(f)
+                    nsamps = _read_varlen_int(f)
                     # allocate space
-                    stamps = np.zeros((nsamples,))
+                    stamps = np.zeros((nsamps,))
                     if temp[s].fmt == 'string':
                         # read a sample comprised of strings
-                        values = [[None]*temp[s].nchns for _ in range(nsamples)]
+                        values = [[None]*temp[s].nchns for _ in range(nsamps)]
                         # for each sample...
-                        for k in range(nsamples):
+                        for k in range(nsamps):
                             # read or deduce time stamp
                             if struct.unpack('B', f.read(1))[0]:
                                 stamps[k] = struct.unpack('<d', f.read(8))[0]
@@ -286,9 +286,9 @@ def load_xdf(filename,
                                 values[k][ch] = raw.decode(errors='replace')
                     else:
                         # read a sample comprised of numeric values
-                        values = np.zeros((nsamples, temp[s].nchns))
+                        values = np.zeros((nsamps, temp[s].nchns))
                         # for each sample...
-                        for k in range(nsamples):
+                        for k in range(nsamps):
                             # read or deduce time stamp
                             if struct.unpack('B', f.read(1))[0]:
                                 stamps[k] = struct.unpack('<d', f.read(8))[0]
@@ -298,9 +298,10 @@ def load_xdf(filename,
                             temp[s].last_timestamp = stamps[k]
                             # read the values
                             raw = f.read(temp[s].samplebytes)
-                            values[k, :] = struct.unpack(temp[s].structfmt, raw)
+                            values[k, :] = struct.unpack(temp[s].structfmt,
+                                                         raw)
                     if verbose:
-                        print('  reading [%s,%s]' % (temp[s].nchns, nsamples))
+                        print('  reading [%s,%s]' % (temp[s].nchns, nsamps))
                     # optionally send through the on_chunk function
                     if on_chunk is not None:
                         values, stamps, streams[s] = on_chunk(values, stamps,
@@ -327,7 +328,7 @@ def load_xdf(filename,
             else:
                 # skip other chunk types (Boundary, ...)
                 f.read(chunklen-2)
-    
+
     # Concatenate the signal across chunks
     for stream in temp.values():
         if stream.time_stamps:
@@ -355,7 +356,7 @@ def load_xdf(filename,
                            clock_reset_threshold_offset_stds,
                            clock_reset_threshold_offset_seconds,
                            winsor_threshold)
-    
+
     # perform jitter removal if requested
     if dejitter_timestamps:
         if verbose:
@@ -374,7 +375,7 @@ def load_xdf(filename,
         stream['time_series'] = tmp.time_series
         stream['time_stamps'] = tmp.time_stamps
 
-    streams = [s for s in streams.values()]
+    streams = [strm for strm in streams.values()]
     return streams, fileheader
 
 
@@ -497,7 +498,8 @@ def _clock_sync(streams,
 
             # Apply the correction to all time stamps
             if len(ranges) == 1:
-                stream.time_stamps += coef[0][0] + coef[0][1]*stream.time_stamps
+                stream.time_stamps += (coef[0][0] +
+                                       coef[0][1]*stream.time_stamps)
             else:
                 for coef_i, range_i in zip(coef, ranges):
                     r = slice(range_i[0], range_i[1])
@@ -510,18 +512,18 @@ def _jitter_removal(streams,
                     break_threshold_seconds=1,
                     break_threshold_samples=500):
     for stream in streams.values():
-        nsamples = len(stream.time_stamps)
-        if nsamples > 0 and stream.srate > 0:
+        nsamps = len(stream.time_stamps)
+        if nsamps > 0 and stream.srate > 0:
             # Identify breaks in the data
             diffs = np.diff(stream.time_stamps)
             breaks_at = diffs > np.max((break_threshold_seconds,
                                         break_threshold_samples*stream.tdiff))
             if np.any(breaks_at):
                 indices = np.where(breaks_at)[0]
-                indices = np.hstack((0, indices, indices+1, nsamples-1))
+                indices = np.hstack((0, indices, indices+1, nsamps-1))
                 ranges = np.reshape(indices, (2, -1)).T
             else:
-                ranges = [(0, nsamples-1)]
+                ranges = [(0, nsamps-1)]
 
             # Process each segment separately
             num_samples = []

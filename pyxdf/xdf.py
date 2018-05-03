@@ -539,7 +539,7 @@ def _jitter_removal(streams,
                     e = np.ones((len(indices),))
                     X = np.reshape(np.hstack((e, indices)), (2, -1)).T
                     y = stream.time_stamps[indices]
-                    mapping = np.linalg.lstsq(X, y)[0]
+                    mapping = np.linalg.lstsq(X, y, rcond=None)[0]
                     stream.time_stamps[indices] = (mapping[0] +
                                                    mapping[1]*indices)
                     effective_srate_np = np.array(effective_srate)
